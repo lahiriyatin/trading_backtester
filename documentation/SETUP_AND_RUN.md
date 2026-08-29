@@ -3,15 +3,9 @@
 This guide starts from a fresh Windows PowerShell session and ends with full-dataset validation.
 
 ## 1. Open the project
-
-```powershell
-cd C:\Users\lahir\Desktop\trading_backtester
-```
-
 On a new computer:
 
 ```powershell
-cd C:\Users\lahir\Desktop
 git clone https://github.com/lahiriyatin/trading_backtester.git
 cd trading_backtester
 ```
