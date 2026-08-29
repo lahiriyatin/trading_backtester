@@ -32,7 +32,7 @@ The current code does **not** implement a completed strategy engine, simulated o
 ## Quick start
 
 ```powershell
-cd C:\Users\lahir\Desktop\trading_backtester
+\trading_backtester
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
 python main.py
