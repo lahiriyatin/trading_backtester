@@ -1,0 +1,26 @@
+﻿from pathlib import Path
+from zoneinfo import ZoneInfo
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+DATA_DIR = PROJECT_ROOT / "data"
+RAW_DATA_DIR = DATA_DIR / "raw"
+PROCESSED_DATA_DIR = DATA_DIR / "processed"
+RESULTS_DIR = PROJECT_ROOT / "results"
+LOG_DIR = PROJECT_ROOT / "logs"
+
+SOURCE_TIMEZONE = ZoneInfo("UTC")
+SESSION_TIMEZONE = ZoneInfo("America/New_York")
+
+SESSION_START = "09:30"
+SESSION_END = "16:00"
+
+SWING_LEFT_CANDLES = 3
+SWING_RIGHT_CANDLES = 3
+
+OTE_RETRACEMENT = 0.60
+
+ATR_PERIOD = 20
+ATR_MULTIPLIER = 2.0
+
+MINIMUM_RR = 2.0
