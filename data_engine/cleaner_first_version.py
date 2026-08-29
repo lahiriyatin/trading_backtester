@@ -13,13 +13,6 @@ REQUIRED_COLUMNS = {
     "interval",
 }
 
-OHLC_COLUMNS = ["open", "high", "low", "close"]
-
-# EUR/USD is quoted to five decimal places.
-# 0.00002 = 0.2 pip.
-ROUNDING_TOLERANCE = 0.00002
-FLOAT_TOLERANCE = 1e-12
-
 
 @dataclass(frozen=True)
 class DataQualityReport:
@@ -28,7 +21,6 @@ class DataQualityReport:
     duplicate_timestamps: int
     missing_values: int
     invalid_timestamps: int
-    repaired_ohlc_rows: int
     invalid_ohlc_rows: int
     missing_minute_intervals: int
 
@@ -52,72 +44,39 @@ def clean_ohlc_data(
         errors="coerce",
     )
 
-    cleaned[OHLC_COLUMNS] = cleaned[OHLC_COLUMNS].apply(
+    numeric_columns = ["open", "high", "low", "close"]
+
+    cleaned[numeric_columns] = cleaned[numeric_columns].apply(
         pd.to_numeric,
         errors="coerce",
     )
 
-    invalid_timestamps = int(
-        cleaned["timestamp"].isna().sum()
-    )
-
+    invalid_timestamps = int(cleaned["timestamp"].isna().sum())
     missing_values = int(
         cleaned[
-            ["timestamp", *OHLC_COLUMNS]
+            ["timestamp", "open", "high", "low", "close"]
         ].isna().sum().sum()
     )
 
     duplicate_timestamps = int(
-        cleaned["timestamp"].duplicated(
-            keep="last"
-        ).sum()
-    )
-
-    violation_amounts = pd.concat(
-        [
-            cleaned["open"] - cleaned["high"],
-            cleaned["close"] - cleaned["high"],
-            cleaned["low"] - cleaned["open"],
-            cleaned["low"] - cleaned["close"],
-        ],
-        axis=1,
-    ).clip(lower=0)
-
-    maximum_violation = violation_amounts.max(axis=1)
-
-    repair_mask = (
-        (maximum_violation > 0)
-        & (
-            maximum_violation
-            <= ROUNDING_TOLERANCE + FLOAT_TOLERANCE
-        )
+        cleaned["timestamp"].duplicated(keep="last").sum()
     )
 
     invalid_ohlc_mask = (
-        maximum_violation
-        > ROUNDING_TOLERANCE + FLOAT_TOLERANCE
+        (cleaned["high"] < cleaned["low"])
+        | (cleaned["high"] < cleaned["open"])
+        | (cleaned["high"] < cleaned["close"])
+        | (cleaned["low"] > cleaned["open"])
+        | (cleaned["low"] > cleaned["close"])
     )
 
-    repaired_ohlc_rows = int(repair_mask.sum())
     invalid_ohlc_rows = int(invalid_ohlc_mask.sum())
 
-    # Repair only tiny rounding inconsistencies.
-    cleaned.loc[repair_mask, "high"] = cleaned.loc[
-        repair_mask,
-        ["open", "high", "close"],
-    ].max(axis=1)
-
-    cleaned.loc[repair_mask, "low"] = cleaned.loc[
-        repair_mask,
-        ["open", "low", "close"],
-    ].min(axis=1)
-
     cleaned = cleaned.dropna(
-        subset=["timestamp", *OHLC_COLUMNS]
+        subset=["timestamp", "open", "high", "low", "close"]
     )
 
     cleaned = cleaned.loc[~invalid_ohlc_mask]
-
     cleaned = cleaned.drop_duplicates(
         subset=["timestamp"],
         keep="last",
@@ -127,12 +86,8 @@ def clean_ohlc_data(
     cleaned = cleaned.reset_index(drop=True)
 
     time_differences = cleaned["timestamp"].diff()
-
     missing_minute_intervals = int(
-        (
-            time_differences
-            > pd.Timedelta(minutes=1)
-        ).sum()
+        (time_differences > pd.Timedelta(minutes=1)).sum()
     )
 
     report = DataQualityReport(
@@ -141,7 +96,6 @@ def clean_ohlc_data(
         duplicate_timestamps=duplicate_timestamps,
         missing_values=missing_values,
         invalid_timestamps=invalid_timestamps,
-        repaired_ohlc_rows=repaired_ohlc_rows,
         invalid_ohlc_rows=invalid_ohlc_rows,
         missing_minute_intervals=missing_minute_intervals,
     )

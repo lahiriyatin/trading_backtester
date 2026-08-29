@@ -89,3 +89,73 @@ def test_data_is_sorted_chronologically() -> None:
     cleaned, _ = clean_ohlc_data(dataframe)
 
     assert cleaned["timestamp"].is_monotonic_increasing
+
+
+######### commented so i don't need to change again
+# def test_small_rounding_violation_is_repaired() -> None:
+#     dataframe = make_valid_data()
+
+#     dataframe.loc[0, "high"] = (
+#         dataframe.loc[0, "open"] - 0.00002
+#     )
+
+#     cleaned, report = clean_ohlc_data(dataframe)
+
+#     repaired = cleaned.loc[
+#         cleaned["timestamp"]
+#         == pd.Timestamp(
+#             "2026-08-29 11:00:00",
+#             tz="UTC",
+#         )
+#     ].iloc[0]
+
+#     assert len(cleaned) == 2
+#     assert report.repaired_ohlc_rows == 1
+#     assert repaired["high"] >= repaired["open"]
+#     assert repaired["high"] >= repaired["close"]
+
+def test_small_rounding_violation_is_repaired() -> None:
+    dataframe = make_valid_data()
+
+    expected_maximum = max(
+        dataframe.loc[0, "open"],
+        dataframe.loc[0, "close"],
+    )
+
+    dataframe.loc[0, "high"] = (
+        expected_maximum - 0.00002
+    )
+
+    cleaned, report = clean_ohlc_data(dataframe)
+
+    repaired_rows = cleaned.loc[
+        cleaned["timestamp"]
+        == pd.Timestamp(
+            "2026-08-29 11:00:00",
+            tz="UTC",
+        )
+    ]
+
+    assert len(repaired_rows) == 1
+
+    repaired = repaired_rows.iloc[0]
+
+    assert len(cleaned) == 2
+    assert report.repaired_ohlc_rows == 1
+    assert report.invalid_ohlc_rows == 0
+    assert repaired["high"] == expected_maximum
+    assert repaired["high"] >= repaired["open"]
+    assert repaired["high"] >= repaired["close"]
+
+
+def test_large_ohlc_violation_is_rejected() -> None:
+    dataframe = make_valid_data()
+
+    dataframe.loc[0, "high"] = (
+        dataframe.loc[0, "open"] - 0.0010
+    )
+
+    cleaned, report = clean_ohlc_data(dataframe)
+
+    assert len(cleaned) == 1
+    assert report.invalid_ohlc_rows == 1
