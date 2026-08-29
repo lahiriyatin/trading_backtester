@@ -15,7 +15,7 @@ from config.settings import (
 
 
 class TwelveDataError(RuntimeError):
-    """Raised when Twelve Data returns an invalid response."""
+    """Raised when Twelve Data returns an invalid or unsuccessful response."""
 
 
 def get_api_key() -> str:
@@ -25,8 +25,7 @@ def get_api_key() -> str:
 
     if not api_key:
         raise TwelveDataError(
-            "TWELVE_DATA_API_KEY was not found. "
-            "Add it to the project .env file."
+            "TWELVE_DATA_API_KEY was not found. Add it to the project .env file."
         )
 
     return api_key
@@ -39,9 +38,7 @@ def fetch_time_series(
     end_date: pd.Timestamp | str | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     if not 1 <= outputsize <= 5000:
-        raise ValueError(
-            "outputsize must be between 1 and 5000"
-        )
+        raise ValueError("outputsize must be between 1 and 5000")
 
     endpoint = f"{TWELVE_DATA_BASE_URL}/time_series"
 
@@ -72,28 +69,10 @@ def fetch_time_series(
             params=parameters,
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
-
         response.raise_for_status()
-
-    except requests.Timeout as error:
-        raise TwelveDataError(
-            "Twelve Data request timed out"
-        ) from error
-
-    except requests.HTTPError as error:
-        status_code = (
-            error.response.status_code
-            if error.response is not None
-            else "unknown"
-        )
-
-        raise TwelveDataError(
-            f"Twelve Data returned HTTP {status_code}"
-        ) from error
-
     except requests.RequestException as error:
         raise TwelveDataError(
-            "Twelve Data request failed"
+            f"API request failed: {error}"
         ) from error
 
     try:
@@ -105,10 +84,7 @@ def fetch_time_series(
 
     if payload.get("status") == "error":
         code = payload.get("code", "unknown")
-        message = payload.get(
-            "message",
-            "Unknown API error",
-        )
+        message = payload.get("message", "Unknown API error")
 
         raise TwelveDataError(
             f"Twelve Data error {code}: {message}"
@@ -119,8 +95,8 @@ def fetch_time_series(
     if not values:
         raise TwelveDataError(
             f"No candle data was returned for {symbol}. "
-            "The symbol, interval, requested date, "
-            "or account plan may not provide access."
+            "The symbol, interval, requested date, or account plan "
+            "may not provide access."
         )
 
     dataframe = pd.DataFrame(values)
@@ -133,14 +109,11 @@ def fetch_time_series(
         "close",
     }
 
-    missing_columns = (
-        required_columns - set(dataframe.columns)
-    )
+    missing_columns = required_columns - set(dataframe.columns)
 
     if missing_columns:
         raise TwelveDataError(
-            "Response is missing columns: "
-            f"{sorted(missing_columns)}"
+            f"Response is missing columns: {sorted(missing_columns)}"
         )
 
     dataframe = dataframe.rename(
@@ -186,22 +159,13 @@ def save_raw_data(
     symbol: str,
     interval: str,
 ) -> Path:
-    RAW_DATA_DIR.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
+    RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     safe_symbol = symbol.replace("/", "").lower()
     safe_interval = interval.lower()
 
-    output_path = (
-        RAW_DATA_DIR
-        / f"{safe_symbol}_{safe_interval}.parquet"
-    )
+    output_path = RAW_DATA_DIR / f"{safe_symbol}_{safe_interval}.parquet"
 
-    dataframe.to_parquet(
-        output_path,
-        index=False,
-    )
+    dataframe.to_parquet(output_path, index=False)
 
     return output_path
